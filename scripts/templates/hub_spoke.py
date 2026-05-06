@@ -1,4 +1,4 @@
-"""Hub-and-spoke template — high contrast, professional style."""
+"""Hub-and-spoke — clean light theme."""
 
 import json
 import math
@@ -7,25 +7,19 @@ from collections import defaultdict
 
 from manim import *
 
-NODE_COLORS = {
-    "document": "#2196F3",
-    "process": "#9C27B0",
-    "database": "#4CAF50",
-    "cloud": "#FF9800",
-    "api": "#FFC107",
-    "user": "#E91E63",
-    "queue": "#00BCD4",
-    "default": "#9C27B0",
+NODE_FILLS = {
+    "document": "#FFF3E0", "process": "#E8EAF6", "database": "#E8F5E9",
+    "cloud": "#E3F2FD", "api": "#FFF8E1", "user": "#FCE4EC",
+    "queue": "#E0F7FA", "default": "#E8EAF6",
 }
-
+NODE_ACCENTS = {
+    "document": "#E65100", "process": "#283593", "database": "#2E7D32",
+    "cloud": "#1565C0", "api": "#F57F17", "user": "#C2185B",
+    "queue": "#00838F", "default": "#283593",
+}
 NODE_ICONS = {
-    "document": "☰",
-    "process": "⚙",
-    "database": "⬢",
-    "cloud": "☁",
-    "api": "➤",
-    "user": "●",
-    "queue": "≡",
+    "document": "📄", "process": "⚙", "database": "🗄",
+    "cloud": "☁", "api": "🔌", "user": "👤", "queue": "📨", "default": "●",
 }
 
 
@@ -36,44 +30,30 @@ def hex_to_color(hex_str):
 def build_node(node, is_hub=False):
     node_type = node.get("type", "process")
     label = node.get("label", node["id"])
-    color = hex_to_color(NODE_COLORS.get(node_type, NODE_COLORS["default"]))
+    fill = hex_to_color(NODE_FILLS.get(node_type, NODE_FILLS["default"]))
+    accent = hex_to_color(NODE_ACCENTS.get(node_type, NODE_ACCENTS["default"]))
 
-    scale = 1.3 if is_hub else 1.0
-    w, h = 2.0 * scale, 1.1 * scale
+    scale = 1.25 if is_hub else 1.0
+    w, h = 2.2 * scale, 1.2 * scale
 
-    body = RoundedRectangle(
-        width=w, height=h, corner_radius=0.15,
-        fill_color=BLACK, fill_opacity=0.6,
-        stroke_color=color, stroke_width=3 if is_hub else 2.5,
-    )
-
-    stripe = Rectangle(
-        width=0.1 * scale, height=h - 0.15,
-        fill_color=color, fill_opacity=1.0,
-        stroke_width=0,
-    ).move_to(body.get_left() + RIGHT * 0.1 * scale)
-
-    icon_bg = Circle(
-        radius=0.15 * scale,
-        fill_color=color, fill_opacity=0.3,
-        stroke_width=0,
-    ).move_to(body.get_top() + DOWN * 0.3 * scale + RIGHT * 0.35 * scale)
-
-    icon = Text(NODE_ICONS.get(node_type, "●"), font_size=12 * scale, color=color)
-    icon.move_to(icon_bg.get_center())
-
-    txt = Text(label, font_size=16 * scale, color=WHITE, weight=BOLD)
-    txt.move_to(body.get_center() + DOWN * 0.08 + RIGHT * 0.08)
-
-    return VGroup(body, stripe, icon_bg, icon, txt)
+    shadow = RoundedRectangle(width=w, height=h, corner_radius=0.18,
+        fill_color=BLACK, fill_opacity=0.08, stroke_width=0).shift(DOWN * 0.03 + RIGHT * 0.03)
+    body = RoundedRectangle(width=w, height=h, corner_radius=0.18,
+        fill_color=fill, fill_opacity=1.0,
+        stroke_color=hex_to_color("#BDBDBD"), stroke_width=2.0 if is_hub else 1.5)
+    icon = Text(NODE_ICONS.get(node_type, "●"), font_size=18 * scale, color=accent)
+    icon.move_to(body.get_left() + RIGHT * 0.4 * scale)
+    txt = Text(label, font_size=15 * scale, color=hex_to_color("#212121"), weight=BOLD)
+    txt.move_to(body.get_center() + RIGHT * 0.08)
+    return VGroup(shadow, body, icon, txt)
 
 
 def detect_hub(nodes_cfg, edges_cfg):
-    edge_count = defaultdict(int)
-    for edge in edges_cfg:
-        edge_count[edge["from"]] += 1
-        edge_count[edge["to"]] += 1
-    return max(edge_count, key=edge_count.get) if edge_count else nodes_cfg[0]["id"]
+    ec = defaultdict(int)
+    for e in edges_cfg:
+        ec[e["from"]] += 1
+        ec[e["to"]] += 1
+    return max(ec, key=ec.get) if ec else nodes_cfg[0]["id"]
 
 
 def load_config():
@@ -91,16 +71,15 @@ class HubSpoke(Scene):
         edges_cfg = data["edges"]
         style = data.get("style", {})
         title_text = data.get("title", "Architecture")
-        edge_color = hex_to_color(style.get("edge_color", "#00BCD4"))
-        dot_color = hex_to_color(style.get("flow_dot_color", "#FFD740"))
 
-        self.camera.background_color = "#0D1117"
+        self.camera.background_color = "#FAFAFA"
 
-        title = Text(title_text, font_size=32, color=WHITE, weight=BOLD)
-        title.to_edge(UP, buff=0.4)
-        accent = Line(title.get_left(), title.get_right(), color=edge_color, stroke_width=2)
-        accent.next_to(title, DOWN, buff=0.1)
-        self.play(Write(title, run_time=1.0), Create(accent, run_time=0.6))
+        title_bg = Rectangle(width=14, height=0.7,
+            fill_color=hex_to_color("#4CAF50"), fill_opacity=1.0, stroke_width=0
+        ).to_edge(UP, buff=0.1)
+        title = Text(title_text, font_size=28, color=WHITE, weight=BOLD)
+        title.move_to(title_bg.get_center())
+        self.play(FadeIn(title_bg, run_time=0.5), Write(title, run_time=0.8))
         self.wait(0.2)
 
         hub_id = data.get("hub", detect_hub(nodes_cfg, edges_cfg))
@@ -108,91 +87,70 @@ class HubSpoke(Scene):
         spoke_ids = [n["id"] for n in nodes_cfg if n["id"] != hub_id]
         num_spokes = len(spoke_ids)
 
-        # Hub node
-        hub_group = build_node(node_map[hub_id], is_hub=True)
-        hub_group.move_to(DOWN * 0.2)
+        # Hub
+        hg = build_node(node_map[hub_id], is_hub=True)
+        hg.move_to(DOWN * 0.2)
+        hg.set_opacity(0)
+        self.add(hg)
+        self.play(hg.animate.set_opacity(1), run_time=0.5)
 
-        hub_group.set_opacity(0)
-        self.add(hub_group)
-        self.play(hub_group.animate.set_opacity(1), run_time=0.6)
-
-        # Hub glow pulse
-        hub_color = hex_to_color(NODE_COLORS.get(node_map[hub_id].get("type", "default"), "#9C27B0"))
-        pulse = Circle(radius=0.6, stroke_color=hub_color, stroke_width=3, fill_opacity=0)
-        pulse.move_to(hub_group.get_center())
-        self.play(
-            pulse.animate.scale(2.5).set_stroke(width=0.5, opacity=0),
-            run_time=0.7, rate_func=smooth,
-        )
+        hub_accent = hex_to_color(NODE_ACCENTS.get(node_map[hub_id].get("type", "default"), "#283593"))
+        pulse = Circle(radius=0.5, stroke_color=hub_accent, stroke_width=3, fill_opacity=0)
+        pulse.move_to(hg.get_center())
+        self.play(pulse.animate.scale(2.2).set_stroke(width=0.5, opacity=0), run_time=0.6, rate_func=smooth)
         self.remove(pulse)
 
-        node_groups = {hub_id: hub_group}
-        node_positions = {hub_id: hub_group.get_center()}
+        node_groups = {hub_id: hg}
+        node_positions = {hub_id: hg.get_center()}
 
-        # Spoke nodes in circle
-        radius = 2.8
+        radius = 2.6
         spoke_groups = []
-        for i, spoke_id in enumerate(spoke_ids):
+        for i, sid in enumerate(spoke_ids):
             angle = -math.pi / 2 + (2 * math.pi * i / num_spokes)
             x = radius * math.cos(angle)
             y = radius * math.sin(angle) - 0.2
+            g = build_node(node_map[sid])
+            g.move_to(RIGHT * x + UP * y)
+            node_groups[sid] = g
+            node_positions[sid] = g.get_center()
+            spoke_groups.append(g)
 
-            group = build_node(node_map[spoke_id])
-            group.move_to(RIGHT * x + UP * y)
-            node_groups[spoke_id] = group
-            node_positions[spoke_id] = group.get_center()
-            spoke_groups.append(group)
+        for g in spoke_groups:
+            g.set_opacity(0)
+            self.add(g)
+        self.play(*[g.animate.set_opacity(1) for g in spoke_groups], run_time=0.7, lag_ratio=0.15)
+        self.wait(0.2)
 
-        # Animate spokes with stagger
-        for group in spoke_groups:
-            group.set_opacity(0)
-            self.add(group)
-        self.play(
-            *[g.animate.set_opacity(1) for g in spoke_groups],
-            run_time=0.8, lag_ratio=0.2,
-        )
-        self.wait(0.3)
+        arrow_color = hex_to_color("#757575")
+        arrows, paths = [], []
+        for idx, edge in enumerate(edges_cfg):
+            sid, did = edge["from"], edge["to"]
+            if sid not in node_positions or did not in node_positions: continue
+            sb = node_groups[sid][1]
+            db = node_groups[did][1]
+            sp, dp = node_positions[sid], node_positions[did]
+            d = dp - sp
+            n = np.linalg.norm(d)
+            if n > 0: d = d / n
+            else: d = RIGHT
+            s, e = sb.get_boundary_point(d), db.get_boundary_point(-d)
+            arr = Arrow(start=s, end=e, color=arrow_color, stroke_width=2,
+                        buff=0.05, max_tip_length_to_length_ratio=0.12, tip_shape=StealthTip)
+            mid = (s + e) / 2
+            sc = Circle(radius=0.18, fill_color=hex_to_color("#FFC107"), fill_opacity=1.0, stroke_width=0).move_to(mid)
+            sn = Text(str(idx + 1), font_size=11, color=hex_to_color("#212121"), weight=BOLD).move_to(mid)
+            arrows.append((arr, sc, sn))
+            paths.append(Line(start=s, end=e))
 
-        # Draw edges
-        arrows = []
-        paths = []
-        for edge in edges_cfg:
-            src_id, dst_id = edge["from"], edge["to"]
-            if src_id not in node_positions or dst_id not in node_positions:
-                continue
-
-            src_body = node_groups[src_id][0]
-            dst_body = node_groups[dst_id][0]
-            src_pos = node_positions[src_id]
-            dst_pos = node_positions[dst_id]
-
-            direction = dst_pos - src_pos
-            norm = np.linalg.norm(direction)
-            if norm > 0:
-                direction = direction / norm
-            else:
-                direction = RIGHT
-
-            start = src_body.get_boundary_point(direction)
-            end = dst_body.get_boundary_point(-direction)
-
-            arrow = Arrow(
-                start=start, end=end, color=edge_color, stroke_width=2.5,
-                buff=0.05, max_tip_length_to_length_ratio=0.12,
-                tip_shape=StealthTip,
-            )
-            arrows.append(arrow)
-            paths.append(Line(start=start, end=end))
-
-        for arrow in arrows:
-            self.play(Create(arrow, run_time=0.5))
+        for arr, sc, sn in arrows:
+            self.play(Create(arr, run_time=0.4), FadeIn(sc, run_time=0.3), FadeIn(sn, run_time=0.3))
         self.wait(0.3)
 
         for path in paths:
-            dot = Dot(radius=0.1, color=dot_color, fill_opacity=1.0)
+            dot = Dot(radius=0.08, color=hex_to_color("#42A5F5"), fill_opacity=1.0)
             dot.move_to(path.get_start())
             self.add(dot)
-            self.play(MoveAlongPath(dot, path, run_time=0.8), rate_func=smooth)
+            self.play(MoveAlongPath(dot, path, run_time=0.6), rate_func=smooth)
             self.remove(dot)
 
         self.wait(1.0)

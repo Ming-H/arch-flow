@@ -1,29 +1,23 @@
-"""Basic linear left-to-right flow template — high contrast, professional style."""
+"""Basic linear left-to-right flow — clean light theme with polished animations."""
 
 import json
 import os
 
 from manim import *
 
-NODE_COLORS = {
-    "document": "#2196F3",
-    "process": "#9C27B0",
-    "database": "#4CAF50",
-    "cloud": "#FF9800",
-    "api": "#FFC107",
-    "user": "#E91E63",
-    "queue": "#00BCD4",
-    "default": "#9C27B0",
+NODE_FILLS = {
+    "document": "#FFF3E0", "process": "#E8EAF6", "database": "#E8F5E9",
+    "cloud": "#E3F2FD", "api": "#FFF8E1", "user": "#FCE4EC",
+    "queue": "#E0F7FA", "default": "#E8EAF6",
 }
-
+NODE_ACCENTS = {
+    "document": "#E65100", "process": "#283593", "database": "#2E7D32",
+    "cloud": "#1565C0", "api": "#F57F17", "user": "#C2185B",
+    "queue": "#00838F", "default": "#283593",
+}
 NODE_ICONS = {
-    "document": "☰",
-    "process": "⚙",
-    "database": "⬢",
-    "cloud": "☁",
-    "api": "➤",
-    "user": "●",
-    "queue": "≡",
+    "document": "📄", "process": "⚙", "database": "🗄",
+    "cloud": "☁", "api": "🔌", "user": "👤", "queue": "📨", "default": "●",
 }
 
 
@@ -34,40 +28,29 @@ def hex_to_color(hex_str):
 def build_node(node):
     node_type = node.get("type", "process")
     label = node.get("label", node["id"])
-    color = hex_to_color(NODE_COLORS.get(node_type, NODE_COLORS["default"]))
+    fill = hex_to_color(NODE_FILLS.get(node_type, NODE_FILLS["default"]))
+    accent = hex_to_color(NODE_ACCENTS.get(node_type, NODE_ACCENTS["default"]))
 
-    w, h = 2.2, 1.3
+    w, h = 2.6, 1.4
 
-    # Background fill — dark but tinted with node color
+    shadow = RoundedRectangle(
+        width=w, height=h, corner_radius=0.2,
+        fill_color=BLACK, fill_opacity=0.06, stroke_width=0,
+    ).shift(DOWN * 0.05 + RIGHT * 0.05)
+
     body = RoundedRectangle(
-        width=w, height=h, corner_radius=0.15,
-        fill_color=BLACK, fill_opacity=0.6,
-        stroke_color=color, stroke_width=2.5,
+        width=w, height=h, corner_radius=0.2,
+        fill_color=fill, fill_opacity=1.0,
+        stroke_color=hex_to_color("#E0E0E0"), stroke_width=1.5,
     )
 
-    # Left accent stripe
-    stripe = Rectangle(
-        width=0.12, height=h - 0.15,
-        fill_color=color, fill_opacity=1.0,
-        stroke_width=0,
-    ).move_to(body.get_left() + RIGHT * 0.12)
+    icon = Text(NODE_ICONS.get(node_type, "●"), font_size=22, color=accent)
+    icon.move_to(body.get_left() + RIGHT * 0.45 + UP * 0.05)
 
-    # Icon circle
-    icon_bg = Circle(
-        radius=0.18,
-        fill_color=color, fill_opacity=0.3,
-        stroke_width=0,
-    ).move_to(body.get_top() + DOWN * 0.35 + RIGHT * 0.4)
+    txt = Text(label, font_size=16, color=hex_to_color("#212121"), weight=BOLD)
+    txt.move_to(body.get_center() + RIGHT * 0.15 + DOWN * 0.05)
 
-    icon_char = NODE_ICONS.get(node_type, "●")
-    icon = Text(icon_char, font_size=14, color=color)
-    icon.move_to(icon_bg.get_center())
-
-    # Label text
-    txt = Text(label, font_size=18, color=WHITE, weight=BOLD)
-    txt.move_to(body.get_center() + DOWN * 0.1 + RIGHT * 0.1)
-
-    return VGroup(body, stripe, icon_bg, icon, txt)
+    return VGroup(shadow, body, icon, txt)
 
 
 def load_config():
@@ -85,22 +68,29 @@ class BasicFlow(Scene):
         edges_cfg = data["edges"]
         style = data.get("style", {})
         title_text = data.get("title", "Architecture")
-        edge_color = hex_to_color(style.get("edge_color", "#00BCD4"))
-        dot_color = hex_to_color(style.get("flow_dot_color", "#FFD740"))
 
-        self.camera.background_color = "#0D1117"
+        arrow_color = hex_to_color("#9E9E9E")
+        dot_color = hex_to_color("#42A5F5")
 
-        # Title
-        title = Text(title_text, font_size=32, color=WHITE, weight=BOLD)
-        title.to_edge(UP, buff=0.5)
-        accent = Line(title.get_left(), title.get_right(), color=edge_color, stroke_width=2)
-        accent.next_to(title, DOWN, buff=0.1)
-        self.play(Write(title, run_time=1.0), Create(accent, run_time=0.6))
-        self.wait(0.2)
+        self.camera.background_color = "#FAFAFA"
 
-        # Layout nodes horizontally
+        # Title bar
+        title_bg = Rectangle(
+            width=14.2, height=0.8,
+            fill_color=hex_to_color("#4CAF50"), fill_opacity=1.0,
+            stroke_width=0,
+        ).to_edge(UP, buff=0)
+        title = Text(title_text, font_size=30, color=WHITE, weight=BOLD)
+        title.move_to(title_bg.get_center())
+
+        self.play(
+            LaggedStart(FadeIn(title_bg, run_time=0.6), Write(title, run_time=0.8), lag_ratio=0.3),
+        )
+        self.wait(0.3)
+
+        # Layout nodes
         n = len(nodes_cfg)
-        spacing = min(3.0, 11.0 / max(n, 1))
+        spacing = min(3.2, 11.5 / max(n, 1))
         start_x = -(n - 1) * spacing / 2
 
         node_groups = {}
@@ -108,31 +98,28 @@ class BasicFlow(Scene):
 
         for i, node in enumerate(nodes_cfg):
             group = build_node(node)
-            pos = RIGHT * (start_x + i * spacing) + DOWN * 0.2
+            pos = RIGHT * (start_x + i * spacing) + DOWN * 0.5
             group.move_to(pos)
             node_groups[node["id"]] = group
             node_positions[node["id"]] = group.get_center()
 
-        # Animate nodes appearing with FadeIn + slight scale
+        # Nodes fade in with stagger
+        node_anims = []
         for node in nodes_cfg:
-            group = node_groups[node["id"]]
-            group.set_opacity(0)
-            self.add(group)
-            self.play(
-                group.animate.set_opacity(1),
-                run_time=0.5,
-                rate_func=smooth,
-            )
-            self.wait(0.15)
+            g = node_groups[node["id"]]
+            g.set_opacity(0)
+            self.add(g)
+            node_anims.append(g.animate.set_opacity(1))
 
-        self.wait(0.3)
+        self.play(LaggedStart(*node_anims, lag_ratio=0.15, run_time=1.5))
+        self.wait(0.4)
 
-        # Draw edges
+        # Draw edges with step numbers
         arrows = []
         paths = []
-        for edge in edges_cfg:
-            src_body = node_groups[edge["from"]][0]
-            dst_body = node_groups[edge["to"]][0]
+        for idx, edge in enumerate(edges_cfg):
+            src_body = node_groups[edge["from"]][1]
+            dst_body = node_groups[edge["to"]][1]
             src_pos = node_positions[edge["from"]]
             dst_pos = node_positions[edge["to"]]
 
@@ -146,30 +133,52 @@ class BasicFlow(Scene):
 
             arrow = Arrow(
                 start=start, end=end,
-                color=edge_color, stroke_width=2.5,
-                buff=0.05, max_tip_length_to_length_ratio=0.15,
+                color=arrow_color, stroke_width=2.5,
+                buff=0.08, max_tip_length_to_length_ratio=0.12,
                 tip_shape=StealthTip,
             )
-            path = Line(start=start, end=end)
-            arrows.append(arrow)
-            paths.append(path)
 
-        for arrow in arrows:
-            self.play(Create(arrow, run_time=0.6))
-        self.wait(0.3)
+            mid = (start + end) / 2
+            step_circle = Circle(
+                radius=0.25, fill_color=hex_to_color("#FFC107"), fill_opacity=1.0,
+                stroke_width=0,
+            ).move_to(mid)
+            step_num = Text(str(idx + 1), font_size=14, color=hex_to_color("#212121"), weight=BOLD)
+            step_num.move_to(mid)
 
-        # Animate data flow dots
+            arrows.append((arrow, step_circle, step_num))
+            paths.append(Line(start=start, end=end))
+
+        # Arrows animate in with stagger
+        arrow_anims = []
+        for arrow, step_circle, step_num in arrows:
+            arrow_anims.extend([
+                Create(arrow, run_time=0.3),
+                GrowFromCenter(step_circle, run_time=0.2),
+                FadeIn(step_num, run_time=0.15),
+            ])
+        self.play(LaggedStart(*arrow_anims, lag_ratio=0.1, run_time=2.0))
+        self.wait(0.4)
+
+        # Data flow dots — trail of 3 dots per edge for smooth flow feel
         for path in paths:
-            dot = Dot(radius=0.12, color=dot_color, fill_opacity=1.0)
-            dot.move_to(path.get_start())
-            self.add(dot)
+            dots = VGroup()
+            for j in range(3):
+                d = Dot(
+                    radius=0.08,
+                    color=dot_color,
+                    fill_opacity=0.9 - j * 0.25,
+                )
+                d.move_to(path.get_start())
+                dots.add(d)
+            self.add(dots)
             self.play(
-                MoveAlongPath(dot, path, run_time=1.0),
+                MoveAlongPath(dots[0], path, run_time=0.8),
                 rate_func=smooth,
             )
-            self.remove(dot)
+            self.remove(dots)
 
-        self.wait(1.0)
+        self.wait(1.5)
 
 
 if __name__ == "__main__":

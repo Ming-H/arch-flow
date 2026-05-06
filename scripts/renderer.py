@@ -102,7 +102,7 @@ def _convert_mp4_to_gif(mp4_path: str, output_path: str) -> str:
     subprocess.run([
         "ffmpeg", "-y",
         "-i", mp4_path,
-        "-vf", "fps=15,scale=854:-1:flags=lanczos,palettegen=max_colors=256:stats_mode=full",
+        "-vf", "fps=15,scale=1920:-1:flags=lanczos,palettegen=max_colors=256:stats_mode=full",
         palette,
     ], check=True, capture_output=True)
 
@@ -111,7 +111,7 @@ def _convert_mp4_to_gif(mp4_path: str, output_path: str) -> str:
         "ffmpeg", "-y",
         "-i", mp4_path,
         "-i", palette,
-        "-lavfi", "fps=15,scale=854:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=3",
+        "-lavfi", "fps=15,scale=1920:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=3",
         "-loop", "0",
         output_path,
     ], check=True, capture_output=True)

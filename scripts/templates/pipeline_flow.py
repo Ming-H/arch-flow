@@ -1,4 +1,4 @@
-"""Pipeline flow template — staged groups, high contrast style."""
+"""Pipeline flow — clean light theme with stage groups."""
 
 import json
 import os
@@ -6,25 +6,19 @@ from collections import defaultdict
 
 from manim import *
 
-NODE_COLORS = {
-    "document": "#2196F3",
-    "process": "#9C27B0",
-    "database": "#4CAF50",
-    "cloud": "#FF9800",
-    "api": "#FFC107",
-    "user": "#E91E63",
-    "queue": "#00BCD4",
-    "default": "#9C27B0",
+NODE_FILLS = {
+    "document": "#FFF3E0", "process": "#E8EAF6", "database": "#E8F5E9",
+    "cloud": "#E3F2FD", "api": "#FFF8E1", "user": "#FCE4EC",
+    "queue": "#E0F7FA", "default": "#E8EAF6",
 }
-
+NODE_ACCENTS = {
+    "document": "#E65100", "process": "#283593", "database": "#2E7D32",
+    "cloud": "#1565C0", "api": "#F57F17", "user": "#C2185B",
+    "queue": "#00838F", "default": "#283593",
+}
 NODE_ICONS = {
-    "document": "☰",
-    "process": "⚙",
-    "database": "⬢",
-    "cloud": "☁",
-    "api": "➤",
-    "user": "●",
-    "queue": "≡",
+    "document": "📄", "process": "⚙", "database": "🗄",
+    "cloud": "☁", "api": "🔌", "user": "👤", "queue": "📨", "default": "●",
 }
 
 
@@ -35,35 +29,20 @@ def hex_to_color(hex_str):
 def build_node(node):
     node_type = node.get("type", "process")
     label = node.get("label", node["id"])
-    color = hex_to_color(NODE_COLORS.get(node_type, NODE_COLORS["default"]))
+    fill = hex_to_color(NODE_FILLS.get(node_type, NODE_FILLS["default"]))
+    accent = hex_to_color(NODE_ACCENTS.get(node_type, NODE_ACCENTS["default"]))
 
-    w, h = 1.8, 1.0
-
-    body = RoundedRectangle(
-        width=w, height=h, corner_radius=0.12,
-        fill_color=BLACK, fill_opacity=0.6,
-        stroke_color=color, stroke_width=2,
-    )
-
-    stripe = Rectangle(
-        width=0.08, height=h - 0.12,
-        fill_color=color, fill_opacity=1.0,
-        stroke_width=0,
-    ).move_to(body.get_left() + RIGHT * 0.08)
-
-    icon_bg = Circle(
-        radius=0.12,
-        fill_color=color, fill_opacity=0.3,
-        stroke_width=0,
-    ).move_to(body.get_top() + DOWN * 0.25 + RIGHT * 0.3)
-
-    icon = Text(NODE_ICONS.get(node_type, "●"), font_size=10, color=color)
-    icon.move_to(icon_bg.get_center())
-
-    txt = Text(label, font_size=14, color=WHITE, weight=BOLD)
-    txt.move_to(body.get_center() + DOWN * 0.05 + RIGHT * 0.05)
-
-    return VGroup(body, stripe, icon_bg, icon, txt)
+    w, h = 2.0, 1.0
+    shadow = RoundedRectangle(width=w, height=h, corner_radius=0.15,
+        fill_color=BLACK, fill_opacity=0.08, stroke_width=0).shift(DOWN * 0.03 + RIGHT * 0.03)
+    body = RoundedRectangle(width=w, height=h, corner_radius=0.15,
+        fill_color=fill, fill_opacity=1.0,
+        stroke_color=hex_to_color("#BDBDBD"), stroke_width=1.5)
+    icon = Text(NODE_ICONS.get(node_type, "●"), font_size=16, color=accent)
+    icon.move_to(body.get_left() + RIGHT * 0.35)
+    txt = Text(label, font_size=14, color=hex_to_color("#212121"), weight=BOLD)
+    txt.move_to(body.get_center() + RIGHT * 0.08)
+    return VGroup(shadow, body, icon, txt)
 
 
 def load_config():
@@ -79,41 +58,31 @@ def auto_detect_stages(nodes_cfg, edges_cfg):
     out_edges = defaultdict(list)
     in_edges = defaultdict(list)
     node_set = set(node_ids)
-
     for edge in edges_cfg:
         if edge["from"] in node_set and edge["to"] in node_set:
             out_edges[edge["from"]].append(edge["to"])
             in_edges[edge["to"]].append(edge["from"])
-
-    visited = set()
-    stages = []
+    visited, stages = set(), []
     sources = [nid for nid in node_ids if len(in_edges[nid]) == 0]
     if not sources:
         sources = [node_ids[0]]
-
     current = sources[:]
     while current and len(visited) < len(node_ids):
         stage = [nid for nid in current if nid not in visited]
         if not stage:
             remaining = [nid for nid in node_ids if nid not in visited]
             stage = remaining[:1] if remaining else []
-            if not stage:
-                break
+            if not stage: break
         stages.append(stage)
+        for nid in stage: visited.add(nid)
+        current = []
         for nid in stage:
-            visited.add(nid)
-        next_nodes = []
-        for nid in stage:
-            for neighbor in out_edges[nid]:
-                if neighbor not in visited:
-                    next_nodes.append(neighbor)
-        current = next_nodes
-
+            for nb in out_edges[nid]:
+                if nb not in visited: current.append(nb)
     for nid in node_ids:
         if nid not in visited:
             stages[-1].append(nid) if stages else stages.append([nid])
-
-    return [{"name": f"Stage {i + 1}", "nodes": stage} for i, stage in enumerate(stages)]
+    return [{"name": f"Stage {i+1}", "nodes": s} for i, s in enumerate(stages)]
 
 
 class PipelineFlow(Scene):
@@ -123,109 +92,89 @@ class PipelineFlow(Scene):
         edges_cfg = data["edges"]
         style = data.get("style", {})
         title_text = data.get("title", "Architecture")
-        edge_color = hex_to_color(style.get("edge_color", "#00BCD4"))
-        dot_color = hex_to_color(style.get("flow_dot_color", "#FFD740"))
 
-        self.camera.background_color = "#0D1117"
+        self.camera.background_color = "#FAFAFA"
 
-        title = Text(title_text, font_size=32, color=WHITE, weight=BOLD)
-        title.to_edge(UP, buff=0.35)
-        accent = Line(title.get_left(), title.get_right(), color=edge_color, stroke_width=2)
-        accent.next_to(title, DOWN, buff=0.1)
-        self.play(Write(title, run_time=1.0), Create(accent, run_time=0.6))
+        title_bg = Rectangle(width=14, height=0.7,
+            fill_color=hex_to_color("#4CAF50"), fill_opacity=1.0, stroke_width=0
+        ).to_edge(UP, buff=0.1)
+        title = Text(title_text, font_size=28, color=WHITE, weight=BOLD)
+        title.move_to(title_bg.get_center())
+        self.play(FadeIn(title_bg, run_time=0.5), Write(title, run_time=0.8))
         self.wait(0.2)
 
         node_map = {n["id"]: n for n in nodes_cfg}
-
         stages = data.get("stages") if "stages" in data else auto_detect_stages(nodes_cfg, edges_cfg)
 
-        num_stages = len(stages)
-        stage_width = min(2.8, 12.0 / max(num_stages, 1))
-        total_width = num_stages * stage_width
-        start_x = -total_width / 2 + stage_width / 2
+        ns = len(stages)
+        sw = min(2.8, 12.0 / max(ns, 1))
+        tw = ns * sw
+        sx = -tw / 2 + sw / 2
 
-        node_groups = {}
-        node_positions = {}
+        node_groups, node_positions = {}, {}
+        stage_accent = hex_to_color("#4CAF50")
 
-        stage_accent = hex_to_color("#00BCD4")
+        for si, stage in enumerate(stages):
+            cx = sx + si * sw
+            nodes = stage["nodes"]
+            nl = len(nodes)
+            ys = 1.2
+            y0 = (nl - 1) * ys / 2
+            bg_h = max(nl * ys + 0.6, 1.8)
 
-        for stage_idx, stage in enumerate(stages):
-            stage_x = start_x + stage_idx * stage_width
-            stage_nodes = stage["nodes"]
-            n_in_stage = len(stage_nodes)
-            y_spacing = 1.3
-            y_start = (n_in_stage - 1) * y_spacing / 2
+            sbg = RoundedRectangle(width=sw - 0.2, height=bg_h, corner_radius=0.15,
+                fill_color=hex_to_color("#F5F5F5"), fill_opacity=0.6,
+                stroke_color=hex_to_color("#BDBDBD"), stroke_width=1.2, stroke_opacity=0.6)
+            sbg.move_to(RIGHT * cx + DOWN * 0.4)
 
-            # Stage background
-            bg_h = max(n_in_stage * y_spacing + 0.8, 2.0)
-            stage_bg = RoundedRectangle(
-                width=stage_width - 0.2, height=bg_h,
-                corner_radius=0.15,
-                fill_color="#111827", fill_opacity=0.5,
-                stroke_color=stage_accent, stroke_width=1.2, stroke_opacity=0.4,
-            )
-            stage_bg.move_to(RIGHT * stage_x + DOWN * 0.4)
+            slbl = Text(stage["name"], font_size=12, color=stage_accent, weight=BOLD)
+            slbl.next_to(sbg, UP, buff=0.06)
 
-            stage_label = Text(stage["name"], font_size=13, color=stage_accent, fill_opacity=0.8)
-            stage_label.next_to(stage_bg, UP, buff=0.08)
+            self.play(FadeIn(sbg, run_time=0.4), Write(slbl, run_time=0.3))
+            self.wait(0.05)
 
-            self.play(FadeIn(stage_bg, run_time=0.5), Write(stage_label, run_time=0.4))
-            self.wait(0.1)
+            for i, nid in enumerate(nodes):
+                g = build_node(node_map[nid])
+                y = y0 - i * ys if nl > 1 else 0
+                g.move_to(RIGHT * cx + DOWN * 0.4 + UP * y)
+                node_groups[nid] = g
+                node_positions[nid] = g.get_center()
+                g.set_opacity(0)
+                self.add(g)
+                self.play(g.animate.set_opacity(1), run_time=0.3)
+            self.wait(0.05)
 
-            for i, nid in enumerate(stage_nodes):
-                group = build_node(node_map[nid])
-                y = y_start - i * y_spacing if n_in_stage > 1 else 0
-                group.move_to(RIGHT * stage_x + DOWN * 0.4 + UP * y)
-                node_groups[nid] = group
-                node_positions[nid] = group.get_center()
+        self.wait(0.2)
 
-                group.set_opacity(0)
-                self.add(group)
-                self.play(group.animate.set_opacity(1), run_time=0.4)
-                self.wait(0.05)
+        arrow_color = hex_to_color("#757575")
+        arrows, paths = [], []
+        for idx, edge in enumerate(edges_cfg):
+            if edge["from"] not in node_positions or edge["to"] not in node_positions: continue
+            sb = node_groups[edge["from"]][1]
+            db = node_groups[edge["to"]][1]
+            sp, dp = node_positions[edge["from"]], node_positions[edge["to"]]
+            d = dp - sp
+            n = np.linalg.norm(d)
+            if n > 0: d = d / n
+            else: d = RIGHT
+            s, e = sb.get_boundary_point(d), db.get_boundary_point(-d)
+            arr = Arrow(start=s, end=e, color=arrow_color, stroke_width=2,
+                        buff=0.05, max_tip_length_to_length_ratio=0.12, tip_shape=StealthTip)
+            mid = (s + e) / 2
+            sc = Circle(radius=0.18, fill_color=hex_to_color("#FFC107"), fill_opacity=1.0, stroke_width=0).move_to(mid)
+            sn = Text(str(idx + 1), font_size=11, color=hex_to_color("#212121"), weight=BOLD).move_to(mid)
+            arrows.append((arr, sc, sn))
+            paths.append(Line(start=s, end=e))
 
-            self.wait(0.1)
-
-        self.wait(0.3)
-
-        # Draw edges
-        arrows = []
-        paths = []
-        for edge in edges_cfg:
-            if edge["from"] not in node_positions or edge["to"] not in node_positions:
-                continue
-            src_body = node_groups[edge["from"]][0]
-            dst_body = node_groups[edge["to"]][0]
-            src_pos = node_positions[edge["from"]]
-            dst_pos = node_positions[edge["to"]]
-
-            direction = dst_pos - src_pos
-            norm = np.linalg.norm(direction)
-            if norm > 0:
-                direction = direction / norm
-            else:
-                direction = RIGHT
-
-            start = src_body.get_boundary_point(direction)
-            end = dst_body.get_boundary_point(-direction)
-
-            arrow = Arrow(
-                start=start, end=end, color=edge_color, stroke_width=2.5,
-                buff=0.05, max_tip_length_to_length_ratio=0.12,
-                tip_shape=StealthTip,
-            )
-            arrows.append(arrow)
-            paths.append(Line(start=start, end=end))
-
-        for arrow in arrows:
-            self.play(Create(arrow, run_time=0.5))
+        for arr, sc, sn in arrows:
+            self.play(Create(arr, run_time=0.4), FadeIn(sc, run_time=0.3), FadeIn(sn, run_time=0.3))
         self.wait(0.3)
 
         for path in paths:
-            dot = Dot(radius=0.1, color=dot_color, fill_opacity=1.0)
+            dot = Dot(radius=0.08, color=hex_to_color("#42A5F5"), fill_opacity=1.0)
             dot.move_to(path.get_start())
             self.add(dot)
-            self.play(MoveAlongPath(dot, path, run_time=0.8), rate_func=smooth)
+            self.play(MoveAlongPath(dot, path, run_time=0.6), rate_func=smooth)
             self.remove(dot)
 
         self.wait(1.0)

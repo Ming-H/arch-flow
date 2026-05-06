@@ -23,7 +23,7 @@ def main():
     parser = argparse.ArgumentParser(description="arch-flow: Generate architecture animation GIFs")
     parser.add_argument("--input", "-i", help="Path to input JSON file")
     parser.add_argument("--output", "-o", help="Output GIF path (default: output/<title>.gif)")
-    parser.add_argument("--quality", "-q", default="low", choices=["low", "medium", "high", "4k"])
+    parser.add_argument("--quality", "-q", default="high", choices=["low", "medium", "high", "4k"])
     parser.add_argument("--json", dest="json_str", help="Inline JSON string")
     args = parser.parse_args()
 
