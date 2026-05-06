@@ -1,57 +1,13 @@
-"""DAG flow — clean light theme with step numbers."""
+"""DAG flow — global layout optimized with layer-wise centering."""
 
 import json
 import os
+import sys
 from collections import defaultdict, deque
+from pathlib import Path
 
-from manim import *
-
-NODE_FILLS = {
-    "document": "#FFF3E0", "process": "#E8EAF6", "database": "#E8F5E9",
-    "cloud": "#E3F2FD", "api": "#FFF8E1", "user": "#FCE4EC",
-    "queue": "#E0F7FA", "default": "#E8EAF6",
-}
-NODE_ACCENTS = {
-    "document": "#E65100", "process": "#283593", "database": "#2E7D32",
-    "cloud": "#1565C0", "api": "#F57F17", "user": "#C2185B",
-    "queue": "#00838F", "default": "#283593",
-}
-NODE_ICONS = {
-    "document": "📄", "process": "⚙", "database": "🗄",
-    "cloud": "☁", "api": "🔌", "user": "👤", "queue": "📨", "default": "●",
-}
-
-
-def hex_to_color(hex_str):
-    return ManimColor.from_hex(hex_str)
-
-
-def build_node(node):
-    node_type = node.get("type", "process")
-    label = node.get("label", node["id"])
-    fill = hex_to_color(NODE_FILLS.get(node_type, NODE_FILLS["default"]))
-    accent = hex_to_color(NODE_ACCENTS.get(node_type, NODE_ACCENTS["default"]))
-
-    w, h = 2.2, 1.2
-
-    shadow = RoundedRectangle(
-        width=w, height=h, corner_radius=0.18,
-        fill_color=BLACK, fill_opacity=0.08, stroke_width=0,
-    ).shift(DOWN * 0.03 + RIGHT * 0.03)
-
-    body = RoundedRectangle(
-        width=w, height=h, corner_radius=0.18,
-        fill_color=fill, fill_opacity=1.0,
-        stroke_color=hex_to_color("#BDBDBD"), stroke_width=1.5,
-    )
-
-    icon = Text(NODE_ICONS.get(node_type, "●"), font_size=18, color=accent)
-    icon.move_to(body.get_left() + RIGHT * 0.4)
-
-    txt = Text(label, font_size=15, color=hex_to_color("#212121"), weight=BOLD)
-    txt.move_to(body.get_center() + RIGHT * 0.1)
-
-    return VGroup(shadow, body, icon, txt)
+sys.path.insert(0, str(Path(__file__).parent))
+from _helpers import *
 
 
 def load_config():
@@ -96,82 +52,61 @@ class DagFlow(Scene):
         data = load_config()
         nodes_cfg = data["nodes"]
         edges_cfg = data["edges"]
-        style = data.get("style", {})
         title_text = data.get("title", "Architecture")
 
-        self.camera.background_color = "#FAFAFA"
+        self.camera.background_color = BG_COLOR
+        add_title(self, title_text)
 
-        title_bg = Rectangle(width=14, height=0.7,
-            fill_color=hex_to_color("#4CAF50"), fill_opacity=1.0, stroke_width=0
-        ).to_edge(UP, buff=0.1)
-        title = Text(title_text, font_size=28, color=WHITE, weight=BOLD)
-        title.move_to(title_bg.get_center())
-        self.play(FadeIn(title_bg, run_time=0.5), Write(title, run_time=0.8))
-        self.wait(0.2)
+        center_y, usable_h = content_area()
+        usable_w = CANVAS_W - 2 * MARGIN
 
         node_map = {n["id"]: n for n in nodes_cfg}
         layers = compute_layers(nodes_cfg, edges_cfg)
 
         num_layers = len(layers)
-        layer_spacing = min(3.0, 5.0 / max(num_layers - 1, 1))
-        top_y = 1.2
 
-        node_groups, node_positions = {}, {}
+        # Measure max layer width to determine horizontal spacing
+        built = {}
+        for node in nodes_cfg:
+            built[node["id"]] = build_node(node)
+
+        # Layer spacing: divide usable height into layers
+        layer_gap = min(2.5, usable_h / max(num_layers, 1))
+        top_y = center_y + (num_layers - 1) * layer_gap / 2
+
+        node_groups = {}
+        node_positions = {}
+
         for li, layer in enumerate(layers):
-            y = top_y - li * layer_spacing if num_layers > 1 else 0
-            nl = len(layer)
-            xs = min(3.0, 8.0 / max(nl, 1))
-            x0 = -(nl - 1) * xs / 2
-            for i, nid in enumerate(layer):
-                g = build_node(node_map[nid])
-                g.move_to(RIGHT * (x0 + i * xs) + UP * y)
-                node_groups[nid] = g
-                node_positions[nid] = g.get_center()
+            y = top_y - li * layer_gap
+            # Center this layer horizontally
+            layer_w = sum(built[nid][1] for nid in layer) + 0.8 * (len(layer) - 1)
+            x_cursor = -layer_w / 2
 
+            for nid in layer:
+                group, w = built[nid]
+                group.move_to(RIGHT * (x_cursor + w / 2) + UP * y)
+                node_groups[nid] = (group, w)
+                node_positions[nid] = group.get_center()
+                x_cursor += w + 0.8
+
+        # Animate layer by layer
         for layer in layers:
             anims = []
             for nid in layer:
-                g = node_groups[nid]
+                g = node_groups[nid][0]
                 g.set_opacity(0)
                 self.add(g)
                 anims.append(g.animate.set_opacity(1))
-            self.play(*anims, run_time=0.5, rate_func=smooth)
+            self.play(*anims, run_time=0.5, lag_ratio=0.1)
             self.wait(0.1)
 
-        self.wait(0.2)
-
-        arrow_color = hex_to_color("#757575")
-        arrows, paths = [], []
-        for idx, edge in enumerate(edges_cfg):
-            sb = node_groups[edge["from"]][1]
-            db = node_groups[edge["to"]][1]
-            sp, dp = node_positions[edge["from"]], node_positions[edge["to"]]
-            d = dp - sp
-            n = np.linalg.norm(d)
-            if n > 0: d = d / n
-            else: d = DOWN
-            s, e = sb.get_boundary_point(d), db.get_boundary_point(-d)
-
-            arr = Arrow(start=s, end=e, color=arrow_color, stroke_width=2,
-                        buff=0.05, max_tip_length_to_length_ratio=0.12, tip_shape=StealthTip)
-            mid = (s + e) / 2
-            sc = Circle(radius=0.2, fill_color=hex_to_color("#FFC107"), fill_opacity=1.0, stroke_width=0).move_to(mid)
-            sn = Text(str(idx + 1), font_size=12, color=hex_to_color("#212121"), weight=BOLD).move_to(mid)
-            arrows.append((arr, sc, sn))
-            paths.append(Line(start=s, end=e))
-
-        for arr, sc, sn in arrows:
-            self.play(Create(arr, run_time=0.4), FadeIn(sc, run_time=0.3), FadeIn(sn, run_time=0.3))
         self.wait(0.3)
 
-        for path in paths:
-            dot = Dot(radius=0.08, color=hex_to_color("#42A5F5"), fill_opacity=1.0)
-            dot.move_to(path.get_start())
-            self.add(dot)
-            self.play(MoveAlongPath(dot, path, run_time=0.6), rate_func=smooth)
-            self.remove(dot)
+        paths = add_edges(self, edges_cfg, node_groups, node_positions)
+        animate_flow_dots(self, paths)
 
-        self.wait(1.0)
+        self.wait(1.5)
 
 
 if __name__ == "__main__":
