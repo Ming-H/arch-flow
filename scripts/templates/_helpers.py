@@ -171,7 +171,17 @@ def animate_flow_dots(self, paths):
 
 
 def content_area():
-    """Return (center_y, usable_height) below title bar."""
-    usable = CANVAS_H - TITLE_H - MARGIN
-    center_y = -(usable / 2) + TITLE_H / 2
+    """Return (center_y, usable_height) below title bar.
+
+    Manim frame: y ranges from -4 to 4 (total height = 8).
+    Title bar sits at the top. Content centered between title and bottom.
+    """
+    frame_top = 4.0
+    frame_bottom = -4.0
+    title_bottom = frame_top - TITLE_H  # 3.2
+    bottom_margin = frame_bottom + MARGIN  # -3.0
+    usable = title_bottom - bottom_margin  # 6.2
+    center_y = (title_bottom + bottom_margin) / 2  # (3.2 + -3.0) / 2 = 0.1
+    # Shift down slightly for visual balance (title bar feels "heavy")
+    center_y -= 0.3
     return center_y, usable
